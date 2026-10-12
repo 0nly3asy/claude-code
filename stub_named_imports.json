@@ -1,0 +1,15 @@
+{
+ "@ant/computer-use-mcp": [
+  "API_RESIZE_PARAMS",
+  "DEFAULT_GRANT_FLAGS",
+  "bindSessionContext",
+  "buildComputerUseTools",
+  "createComputerUseMcpServer",
+  "getSentinelCategory",
+  "targetImageSize"
+ ],
+ "@ant/claude-for-chrome-mcp": [
+  "BROWSER_TOOLS",
+  "createClaudeForChromeMcpServer"
+ ]
+}

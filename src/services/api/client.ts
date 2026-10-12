@@ -14,7 +14,9 @@ import { getUserAgent } from 'src/utils/http.js'
 import { getSmallFastModel } from 'src/utils/model/model.js'
 import {
   getAPIProvider,
+  getAtriaBaseUrl,
   isFirstPartyAnthropicBaseUrl,
+  isAtriaProvider,
 } from 'src/utils/model/providers.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
 import {
@@ -187,6 +189,23 @@ export async function getAnthropicClient({
     }
     // we have always been lying about the return type - this doesn't support batching or models
     return new AnthropicBedrock(bedrockArgs) as unknown as Anthropic
+  }
+
+  // Atria (Convergence fork): Anthropic Messages-API compatible provider.
+  // When ATRIA_API_KEY is present we talk to the Atria ASI endpoint with the
+  // Atria key instead of an Anthropic key. The base URL must NOT include a
+  // trailing /v1 because the SDK appends /v1/messages itself.
+  if (isAtriaProvider()) {
+    logForDebugging(
+      `[API:request] Using Atria provider, baseUrl: ${getAtriaBaseUrl()}, model: ${model ?? '(unset)'}`,
+    )
+    const atriaArgs: ConstructorParameters<typeof Anthropic>[0] = {
+      apiKey: process.env.ATRIA_API_KEY,
+      baseURL: getAtriaBaseUrl(),
+      ...ARGS,
+      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+    }
+    return new Anthropic(atriaArgs)
   }
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)) {
     const { AnthropicFoundry } = await import('@anthropic-ai/foundry-sdk')

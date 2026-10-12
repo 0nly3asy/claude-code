@@ -23,7 +23,7 @@ import { getModelStrings, resolveOverriddenModel } from './modelStrings.js'
 import { formatModelPricing, getOpus46CostTier } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
-import { getAPIProvider } from './providers.js'
+import { getAPIProvider , getAtriaDefaultModel, isAtriaProvider } from './providers.js'
 import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
@@ -93,6 +93,11 @@ export function getMainLoopModel(): ModelName {
   const model = getUserSpecifiedModelSetting()
   if (model !== undefined && model !== null) {
     return parseUserSpecifiedModel(model)
+  }
+  // Convergence fork: when the Atria provider is active and the user has not
+  // chosen a model, default to the Atria model instead of a claude-* model.
+  if (isAtriaProvider()) {
+    return getAtriaDefaultModel() as ModelName
   }
   return getDefaultMainLoopModel()
 }

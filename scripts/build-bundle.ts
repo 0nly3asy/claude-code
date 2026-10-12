@@ -25,9 +25,89 @@ const noSourcemap = process.argv.includes('--no-sourcemap')
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf-8'))
 const version = pkg.version || '0.0.0-dev'
 
-// ── Plugin: resolve bare 'src/' imports (tsconfig baseUrl: ".") ──
-// The codebase uses `import ... from 'src/foo/bar.js'` which relies on
-// TypeScript's baseUrl resolution. This plugin maps those to real TS files.
+// Convergence fork: redirect any bare import that cannot be resolved to a
+// generated stub. The upstream tree imports a number of Anthropic-internal
+// packages (@ant/*, the .napi native addons, optional cloud SDKs) that are not
+// published to npm and are only reachable via default-off feature flags. Rather
+// than listing them by hand, resolve-or-stub: if the package is installed we use
+// it, otherwise we emit an inert stub so Node never sees an unresolvable import.
+const builtinModules = new Set(
+  require('module').builtinModules as unknown as string[],
+)
+const isBuiltin = (spec: string) =>
+  builtinModules.has(spec) || spec.startsWith('node:')
+
+const stubResolverPlugin: esbuild.Plugin = {
+  name: 'convergence-stub-resolver',
+  setup(build) {
+    const fs = require('fs')
+    const path = require('path')
+
+    // Precompute the stub directory once.
+    const stubRoot = path.resolve(ROOT, 'node_modules', '.convergence-stubs')
+    fs.mkdirSync(stubRoot, { recursive: true })
+
+    const ensureStub = (spec: string): string => {
+      const pkgName = spec.startsWith('@')
+        ? spec.split('/').slice(0, 2).join('/')
+        : spec.split('/')[0]
+      const pkgDir = path.resolve(stubRoot, pkgName)
+      const index = path.resolve(pkgDir, 'index.mjs')
+      const pkgJson = path.resolve(pkgDir, 'package.json')
+      if (!fs.existsSync(pkgJson)) {
+        fs.mkdirSync(pkgDir, { recursive: true })
+        fs.writeFileSync(
+          pkgJson,
+          JSON.stringify(
+            {
+              name: pkgName + '.convergence-stub',
+              version: '0.0.0',
+              description:
+                'Convergence fork auto-stub for an unresolvable Anthropic-internal/optional package.',
+              type: 'module',
+              main: './index.mjs',
+              exports: { '.': './index.mjs' },
+            },
+            null,
+            2,
+          ),
+        )
+        fs.writeFileSync(
+          index,
+          [
+            '// Convergence fork auto-generated stub for ' + pkgName + '.',
+            '// The real package is not installable here and is only reachable',
+            '// behind default-off feature flags. Exports are inert.',
+            'const handler = { get: () => () => undefined }',
+            'export default new Proxy({}, handler)',
+            'export const __convergenceStub = true',
+          ].join('\n') + '\n',
+        )
+      }
+      return pkgDir
+    }
+
+    // Only intercept bare specifiers whose package is NOT installed under
+    // node_modules. Installed packages resolve normally through esbuild.
+    // Match bare specifiers: unscoped ('foo', 'foo/bar') and scoped ('@ant/x', '@ant/x/y').
+    build.onResolve({ filter: /^(?:@[a-z0-9-]+\/)?[a-z0-9-]+/i }, (args) => {
+      const spec = args.path
+      if (isBuiltin(spec)) return undefined
+      if (spec.startsWith('bun:')) return undefined
+      const pkgName = spec.startsWith('@')
+        ? spec.split('/').slice(0, 2).join('/')
+        : spec.split('/')[0]
+      const installedDir = path.resolve(ROOT, 'node_modules', pkgName)
+      if (fs.existsSync(installedDir)) return undefined // let esbuild resolve it
+      ensureStub(spec)
+      return {
+        path: path.resolve(stubRoot, pkgName, 'index.mjs'),
+        external: false,
+      }
+    })
+  },
+}
+
 const srcResolverPlugin: esbuild.Plugin = {
   name: 'src-resolver',
   setup(build) {
@@ -75,7 +155,7 @@ const buildOptions: esbuild.BuildOptions = {
   // Single-file output — no code splitting for CLI tools
   splitting: false,
 
-  plugins: [srcResolverPlugin],
+  plugins: [srcResolverPlugin, stubResolverPlugin],
 
   // Use tsconfig for baseUrl / paths resolution (complements plugin above)
   tsconfig: resolve(ROOT, 'tsconfig.json'),
@@ -97,43 +177,13 @@ const buildOptions: esbuild.BuildOptions = {
     'node:*',
     // Native addons that can't be bundled
     'fsevents',
-    'sharp',
-    'image-processor-napi',
+
+
     // Anthropic-internal packages (not published externally)
-    '@anthropic-ai/sandbox-runtime',
-    '@anthropic-ai/claude-agent-sdk',
-    // Convergence fork: optional cloud/telemetry providers + native addons.
-    // These serve non-default model providers (Bedrock/Vertex/Foundry) and
-    // telemetry exporters that the Atria-only build never imports at runtime.
-    // They are npm packages that are not installed here, so mark them external
-    // to keep them out of the bundle.
-    '@anthropic-ai/bedrock-sdk',
-    '@anthropic-ai/foundry-sdk',
-    '@anthropic-ai/mcpb',
-    '@anthropic-ai/vertex-sdk',
-    '@aws-sdk/client-bedrock',
-    '@aws-sdk/client-bedrock-runtime',
-    '@aws-sdk/client-sts',
-    '@aws-sdk/credential-provider-node',
-    '@azure/identity',
-    '@smithy/core',
-    '@smithy/node-http-handler',
-    '@opentelemetry/exporter-logs-otlp-grpc',
-    '@opentelemetry/exporter-logs-otlp-http',
-    '@opentelemetry/exporter-logs-otlp-proto',
-    '@opentelemetry/exporter-metrics-otlp-grpc',
-    '@opentelemetry/exporter-metrics-otlp-http',
-    '@opentelemetry/exporter-metrics-otlp-proto',
-    '@opentelemetry/exporter-prometheus',
-    '@opentelemetry/exporter-trace-otlp-grpc',
-    '@opentelemetry/exporter-trace-otlp-http',
-    '@opentelemetry/exporter-trace-otlp-proto',
-    'audio-capture-napi',
-    'color-diff-napi',
-    'modifiers-napi',
-    'vscode-jsonrpc/node.js',
+
+
     // Anthropic-internal (@ant/) packages — gated behind USER_TYPE === 'ant'
-    '@ant/*',
+
   ],
 
   jsx: 'automatic',
