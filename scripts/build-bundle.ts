@@ -102,6 +102,36 @@ const buildOptions: esbuild.BuildOptions = {
     // Anthropic-internal packages (not published externally)
     '@anthropic-ai/sandbox-runtime',
     '@anthropic-ai/claude-agent-sdk',
+    // Convergence fork: optional cloud/telemetry providers + native addons.
+    // These serve non-default model providers (Bedrock/Vertex/Foundry) and
+    // telemetry exporters that the Atria-only build never imports at runtime.
+    // They are npm packages that are not installed here, so mark them external
+    // to keep them out of the bundle.
+    '@anthropic-ai/bedrock-sdk',
+    '@anthropic-ai/foundry-sdk',
+    '@anthropic-ai/mcpb',
+    '@anthropic-ai/vertex-sdk',
+    '@aws-sdk/client-bedrock',
+    '@aws-sdk/client-bedrock-runtime',
+    '@aws-sdk/client-sts',
+    '@aws-sdk/credential-provider-node',
+    '@azure/identity',
+    '@smithy/core',
+    '@smithy/node-http-handler',
+    '@opentelemetry/exporter-logs-otlp-grpc',
+    '@opentelemetry/exporter-logs-otlp-http',
+    '@opentelemetry/exporter-logs-otlp-proto',
+    '@opentelemetry/exporter-metrics-otlp-grpc',
+    '@opentelemetry/exporter-metrics-otlp-http',
+    '@opentelemetry/exporter-metrics-otlp-proto',
+    '@opentelemetry/exporter-prometheus',
+    '@opentelemetry/exporter-trace-otlp-grpc',
+    '@opentelemetry/exporter-trace-otlp-http',
+    '@opentelemetry/exporter-trace-otlp-proto',
+    'audio-capture-napi',
+    'color-diff-napi',
+    'modifiers-napi',
+    'vscode-jsonrpc/node.js',
     // Anthropic-internal (@ant/) packages — gated behind USER_TYPE === 'ant'
     '@ant/*',
   ],
@@ -136,6 +166,14 @@ const buildOptions: esbuild.BuildOptions = {
   },
 
   // Handle the .js → .ts resolution that the codebase uses
+  // Convergence fork: import .md/.txt/.markdown skill docs as plain strings.
+  // Bun's bundler handles this natively; esbuild needs an explicit loader.
+  loader: {
+    '.md': 'text',
+    '.markdown': 'text',
+    '.txt': 'text',
+  },
+
   resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
 
   logLevel: 'info',

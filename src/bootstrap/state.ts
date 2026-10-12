@@ -1758,3 +1758,5 @@ export function setPromptId(id: string | null): void {
 
 
 
+
+export const isReplBridgeActive = false  // stub: inert until subsystem implemented

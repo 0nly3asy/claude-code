@@ -1,0 +1,11 @@
+# Convergence fork
+node_modules/
+dist/
+build_out*.txt
+missing_map.json
+parse_build.py
+patch_external.py
+patch_loader.py
+patch_named.py
+stubs.tar.gz
+*.log
