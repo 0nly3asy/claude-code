@@ -7,7 +7,7 @@
 
 import * as esbuild from 'esbuild'
 import { resolve, dirname } from 'path'
-import { chmodSync, readFileSync, existsSync } from 'fs'
+import { chmodSync, readFileSync, writeFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 
 // Bun: import.meta.dir — Node 21+: import.meta.dirname — fallback
@@ -174,17 +174,17 @@ const buildOptions: esbuild.BuildOptions = {
     'perf_hooks', 'async_hooks', 'dns', 'dgram', 'cluster',
     'string_decoder', 'module', 'vm', 'constants', 'domain',
     'console', 'process', 'v8', 'inspector',
-    'node:*',
-    // Native addons that can't be bundled
-    'fsevents',
-
-
-    // Anthropic-internal packages (not published externally)
-
-
-    // Anthropic-internal (@ant/) packages — gated behind USER_TYPE === 'ant'
-
+    // CJS packages that call require() at load time; must stay external
+    // so Node loads them natively instead of being inlined into the ESM bundle.
+    'node-fetch',
+    'agentkeepalive',
+    'commander',
+    '@commander-js/extra-typings',
+    'jsonc-parser',
   ],
+
+  // Convergence fork: give the ESM bundle a working require() for inlined CJS deps
+  inject: [resolve(ROOT, 'scripts/require-shim.js')],
 
   jsx: 'automatic',
 
@@ -232,6 +232,24 @@ const buildOptions: esbuild.BuildOptions = {
   metafile: true,
 }
 
+// Convergence fork: esbuild's CJS shim throws "Dynamic require of X is not
+// supported" when a CommonJS dependency inlined into the ESM bundle calls
+// require('fs') at load time. Rewrite the throwing branch to fall back to
+// createRequire(import.meta.url) instead.
+function patchRequireShim(outPath: string): void {
+  const code = readFileSync(outPath, 'utf8')
+  const marker = `throw Error('Dynamic require of "' + x3 + '" is not supported');`
+  if (!code.includes(marker)) {
+    return
+  }
+  // Replace the throwing branch with a createRequire fallback. The marker line
+  // is unique in the bundle, so a direct replace is safe.
+  const replacement = `const __cr = (await import('node:module')).createRequire(import.meta.url)
+    return __cr(x3)`
+  writeFileSync(outPath, code.replace(marker, replacement))
+  console.log('[convergence] patched require shim for inlined CJS dependencies')
+}
+
 async function main() {
   if (watch) {
     const ctx = await esbuild.context(buildOptions)
@@ -247,10 +265,14 @@ async function main() {
     }
 
     // Make the output executable
+
     const outPath = resolve(ROOT, 'dist/cli.mjs')
     try {
       chmodSync(outPath, 0o755)
     } catch {
+
+  patchRequireShim(outPath)
+  // Convergence fork: give inlined CJS deps a working require().
       // chmod may fail on some platforms, non-fatal
     }
 
