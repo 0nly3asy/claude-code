@@ -2856,6 +2856,11 @@ async function run(): Promise<CommanderCommand> {
         workload: options.workload,
         setupTrigger: setupTrigger ?? undefined,
         sessionStartHooksPromise
+      }).catch((e: unknown) => {
+        // Convergence fork: `void runHeadless(...)` used to swallow rejections,
+        // producing a silent exit 0. Surface the error and fail the process.
+        process.stderr.write(`fatal(runHeadless): ${(e as Error)?.stack ?? String(e)}\n`);
+        process.exitCode = 1;
       });
       return;
     }
@@ -3884,7 +3889,14 @@ async function run(): Promise<CommanderCommand> {
   const isCcUrl = process.argv.some(a => a.startsWith('cc://') || a.startsWith('cc+unix://'));
   if (isPrintMode && !isCcUrl) {
     profileCheckpoint('run_before_parse');
-    await program.parseAsync(process.argv);
+    try {
+      await program.parseAsync(process.argv);
+    } catch (e) {
+      // Convergence fork: print action-handler failures instead of exiting silently.
+      process.stderr.write(`fatal: ${(e as Error)?.stack ?? String(e)}\n`);
+      process.exitCode = 1;
+      throw e;
+    }
     profileCheckpoint('run_after_parse');
     return program;
   }

@@ -205,7 +205,10 @@ const buildOptions: esbuild.BuildOptions = {
     // Convergence fork: getBuildAgeMinutes() reads MACRO.BUILD_TIME. esbuild
     // only substitutes exact `define` matches, so provide it or it throws
     // at runtime on the first real API query.
-    'MACRO.BUILD_TIME': 'Date.now()',
+    // Convergence fork: esbuild's `define` only accepts an entity name or a
+    // JS literal, so evaluate the build timestamp here and inline it as a
+    // numeric epoch-ms. getBuildAgeMinutes() does new Date(MACRO.BUILD_TIME).
+    'MACRO.BUILD_TIME': JSON.stringify(Date.now()),
     'MACRO.PACKAGE_URL': JSON.stringify('@anthropic-ai/claude-code'),
     'MACRO.ISSUES_EXPLAINER': JSON.stringify(
       'report issues at https://github.com/anthropics/claude-code/issues'

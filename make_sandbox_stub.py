@@ -26,7 +26,28 @@ export class SandboxManager {
   // Convergence fork: isSandboxingEnabled()/checkDependencies() call these
   // static methods; inert implementations so they never throw.
   static isSupportedPlatform() { return false }
-  static checkDependencies(..._args) { return { errors: [] } }
+  static checkDependencies(..._args) { return { errors: [], warnings: [] } }
+  static async initialize(..._args) {}
+  static async reset() {}
+  static updateConfig(..._args) {}
+  static async waitForNetworkInitialization() { return false }
+  static getSandboxViolationStore() {
+    return { record() {}, getAll() { return [] }, clear() {}, subscribe() { return () => {} } }
+  }
+  static annotateStderrWithSandboxFailures(_cmd, stderr) { return stderr }
+  static cleanupAfterCommand() {}
+  static async wrapWithSandbox(cmd) { return cmd }
+  static getFsReadConfig() { return {} }
+  static getFsWriteConfig() { return {} }
+  static getNetworkRestrictionConfig() { return {} }
+  static getAllowUnixSockets() { return [] }
+  static getAllowLocalBinding() { return false }
+  static getIgnoreViolations() { return undefined }
+  static getEnableWeakerNestedSandbox() { return false }
+  static getProxyPort() { return undefined }
+  static getSocksProxyPort() { return undefined }
+  static getLinuxHttpSocketPath() { return undefined }
+  static getLinuxSocksSocketPath() { return undefined }
 }
 export const SandboxRuntimeConfigSchema = {
   type: 'object',

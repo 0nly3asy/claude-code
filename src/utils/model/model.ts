@@ -181,6 +181,12 @@ export function getRuntimeMainLoopModel(params: {
  * @returns The default model setting to use
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
+  // Convergence fork: with the Atria provider active the Anthropic defaults
+  // below resolve to undefined; use the Atria model explicitly.
+  if (isAtriaProvider()) {
+    return getAtriaDefaultModel() as ModelName
+  }
+
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
   if (process.env.USER_TYPE === 'ant') {
     return (
