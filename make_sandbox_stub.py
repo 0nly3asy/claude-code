@@ -23,6 +23,10 @@ export class SandboxManager {
   async start() {}
   async stop() {}
   isRunning() { return false }
+  // Convergence fork: isSandboxingEnabled()/checkDependencies() call these
+  // static methods; inert implementations so they never throw.
+  static isSupportedPlatform() { return false }
+  static checkDependencies(..._args) { return { errors: [] } }
 }
 export const SandboxRuntimeConfigSchema = {
   type: 'object',

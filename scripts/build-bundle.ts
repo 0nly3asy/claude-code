@@ -202,6 +202,10 @@ const buildOptions: esbuild.BuildOptions = {
   // process.env.USER_TYPE — eliminates 'ant' (Anthropic-internal) code branches
   define: {
     'MACRO.VERSION': JSON.stringify(version),
+    // Convergence fork: getBuildAgeMinutes() reads MACRO.BUILD_TIME. esbuild
+    // only substitutes exact `define` matches, so provide it or it throws
+    // at runtime on the first real API query.
+    'MACRO.BUILD_TIME': 'Date.now()',
     'MACRO.PACKAGE_URL': JSON.stringify('@anthropic-ai/claude-code'),
     'MACRO.ISSUES_EXPLAINER': JSON.stringify(
       'report issues at https://github.com/anthropics/claude-code/issues'

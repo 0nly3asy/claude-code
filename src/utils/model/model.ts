@@ -220,6 +220,11 @@ export function getDefaultMainLoopModel(): ModelName {
  * module top-level (see MODEL_COSTS in modelCost.ts).
  */
 export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
+  // Convergence fork: custom providers (e.g. Atria) have no first-party
+  // canonical name; guard so cost lookups do not throw on undefined.
+  if (name === undefined || name === null) {
+    return undefined as unknown as ModelShortName
+  }
   name = name.toLowerCase()
   // Special cases for Claude 4+ models to differentiate versions
   // Order matters: check more specific versions first (4-5 before 4)
@@ -450,6 +455,12 @@ export function getPublicModelName(model: ModelName): string {
 export function parseUserSpecifiedModel(
   modelInput: ModelName | ModelAlias,
 ): ModelName {
+  // Convergence fork: with the Atria provider active and no model chosen, the
+  // default setting is undefined; fall back instead of throwing on .trim().
+  if (modelInput === undefined || modelInput === null) {
+    if (isAtriaProvider()) return getAtriaDefaultModel() as ModelName
+    return getDefaultMainLoopModel()
+  }
   const modelInputTrimmed = modelInput.trim()
   const normalizedModel = modelInputTrimmed.toLowerCase()
 
