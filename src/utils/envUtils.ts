@@ -13,6 +13,16 @@ export const getClaudeConfigHomeDir = memoize(
   () => process.env.CLAUDE_CONFIG_DIR,
 )
 
+// Codex (Convergence fork): Codex CLI's config home, mirroring
+// getClaudeConfigHomeDir so an existing Codex install's global AGENTS.md and
+// skills load without copying files.
+export const getCodexConfigHomeDir = memoize(
+  (): string => {
+    return (process.env.CODEX_HOME ?? join(homedir(), '.codex')).normalize('NFC')
+  },
+  () => process.env.CODEX_HOME,
+)
+
 export function getTeamsDir(): string {
   return join(getClaudeConfigHomeDir(), 'teams')
 }

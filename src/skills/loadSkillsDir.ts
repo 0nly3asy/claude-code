@@ -31,6 +31,7 @@ import {
 } from '../utils/effort.js'
 import {
   getClaudeConfigHomeDir,
+  getCodexConfigHomeDir,
   isBareMode,
   isEnvTruthy,
 } from '../utils/envUtils.js'
@@ -638,11 +639,12 @@ async function loadSkillsFromCommandsDir(
 export const getSkillDirCommands = memoize(
   async (cwd: string): Promise<Command[]> => {
     const userSkillsDir = join(getClaudeConfigHomeDir(), 'skills')
+    const codexSkillsDir = join(getCodexConfigHomeDir(), 'skills')
     const managedSkillsDir = join(getManagedFilePath(), '.claude', 'skills')
     const projectSkillsDirs = getProjectDirsUpToHome('skills', cwd)
 
     logForDebugging(
-      `Loading skills from: managed=${managedSkillsDir}, user=${userSkillsDir}, project=[${projectSkillsDirs.join(', ')}]`,
+      `Loading skills from: managed=${managedSkillsDir}, user=${userSkillsDir}, codex=${codexSkillsDir}, project=[${projectSkillsDirs.join(', ')}]`,
     )
 
     // Load from additional directories (--add-dir)
@@ -687,7 +689,10 @@ export const getSkillDirCommands = memoize(
         ? Promise.resolve([])
         : loadSkillsFromSkillsDir(managedSkillsDir, 'policySettings'),
       isSettingSourceEnabled('userSettings') && !skillsLocked
-        ? loadSkillsFromSkillsDir(userSkillsDir, 'userSettings')
+        ? Promise.all([
+            loadSkillsFromSkillsDir(userSkillsDir, 'userSettings'),
+            loadSkillsFromSkillsDir(codexSkillsDir, 'userSettings'),
+          ]).then(skills => skills.flat())
         : Promise.resolve([]),
       projectSettingsEnabled
         ? Promise.all(

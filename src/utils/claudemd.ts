@@ -56,7 +56,11 @@ import {
 } from './config.js'
 import { logForDebugging } from './debug.js'
 import { logForDiagnosticsNoPII } from './diagLogs.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
+import {
+  getClaudeConfigHomeDir,
+  getCodexConfigHomeDir,
+  isEnvTruthy,
+} from './envUtils.js'
 import { getErrnoCode } from './errors.js'
 import { normalizePathForComparison } from './file.js'
 import { cacheKeys, type FileStateCache } from './fileStateCache.js'
@@ -844,6 +848,18 @@ export const getMemoryFiles = memoize(
           conditionalRule: false,
         })),
       )
+
+      // Codex (Convergence fork): global instructions $CODEX_HOME/AGENTS.md,
+      // loaded as User memory alongside ~/.claude/CLAUDE.md.
+      const codexAgentsMd = join(getCodexConfigHomeDir(), 'AGENTS.md')
+      result.push(
+        ...(await processMemoryFile(
+          codexAgentsMd,
+          'User',
+          processedPaths,
+          true, // Codex global memory may include external files, like user CLAUDE.md
+        )),
+      )
     }
 
     // Then process Project and Local files
@@ -906,6 +922,17 @@ export const getMemoryFiles = memoize(
           )),
         )
 
+        // Codex (Convergence fork): AGENTS.md at this level, same tier as CLAUDE.md
+        const agentsPath = join(dir, 'AGENTS.md')
+        result.push(
+          ...(await processMemoryFile(
+            agentsPath,
+            'Project',
+            processedPaths,
+            includeExternal,
+          )),
+        )
+
         // Try reading .claude/rules/*.md files (Project)
         const rulesDir = join(dir, '.claude', 'rules')
         result.push(
@@ -956,6 +983,17 @@ export const getMemoryFiles = memoize(
         result.push(
           ...(await processMemoryFile(
             dotClaudePath,
+            'Project',
+            processedPaths,
+            includeExternal,
+          )),
+        )
+
+        // Codex (Convergence fork): AGENTS.md from the additional directory
+        const agentsPath = join(dir, 'AGENTS.md')
+        result.push(
+          ...(await processMemoryFile(
+            agentsPath,
             'Project',
             processedPaths,
             includeExternal,
@@ -1273,6 +1311,11 @@ export async function getMemoryFilesForNestedDirectory(
         false,
       )),
     )
+    // Codex (Convergence fork): AGENTS.md for nested directories
+    const agentsPath = join(dir, 'AGENTS.md')
+    result.push(
+      ...(await processMemoryFile(agentsPath, 'Project', processedPaths, false)),
+    )
   }
 
   // Process local memory file (CLAUDE.local.md)
@@ -1435,8 +1478,12 @@ export async function shouldShowClaudeMdExternalIncludesWarning(): Promise<boole
 export function isMemoryFilePath(filePath: string): boolean {
   const name = basename(filePath)
 
-  // CLAUDE.md or CLAUDE.local.md anywhere
-  if (name === 'CLAUDE.md' || name === 'CLAUDE.local.md') {
+  // CLAUDE.md, CLAUDE.local.md, or AGENTS.md (Codex) anywhere
+  if (
+    name === 'CLAUDE.md' ||
+    name === 'CLAUDE.local.md' ||
+    name === 'AGENTS.md'
+  ) {
     return true
   }
 
