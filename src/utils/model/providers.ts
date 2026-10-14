@@ -52,7 +52,7 @@ export function isFirstPartyAnthropicBaseUrl(): boolean {
  * suffix.
  */
 export const ATRIA_DEFAULT_BASE_URL = 'https://api.atria-asi.ai'
-export const ATRIA_DEFAULT_MODEL = 'Atria-Dawn-Preview'
+export const ATRIA_DEFAULT_MODEL = 'Atria-Dawn'
 
 export function getAtriaDefaultModel(): string {
   return process.env.ATRIA_MODEL || ATRIA_DEFAULT_MODEL
